@@ -11,7 +11,29 @@ CREATE TABLE IF NOT EXISTS profiles (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_gender ON profiles(gender);
-CREATE INDEX idx_age_group ON profiles(age_group);
-CREATE INDEX idx_country_id ON profiles(country_id);
-CREATE INDEX idx_age ON profiles(age);
+CREATE TABLE IF NOT EXISTS users (
+    id VARCHAR(36) PRIMARY KEY,
+    github_id VARCHAR UNIQUE NOT NULL,
+    username VARCHAR NOT NULL,
+    email VARCHAR,
+    avatar_url VARCHAR,
+    role VARCHAR CHECK (role IN ('admin', 'analyst')) DEFAULT 'analyst',
+    is_active BOOLEAN DEFAULT true,
+    last_login_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) REFERENCES users(id) ON DELETE CASCADE,
+    token VARCHAR UNIQUE NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_gender ON profiles(gender);
+CREATE INDEX IF NOT EXISTS idx_age_group ON profiles(age_group);
+CREATE INDEX IF NOT EXISTS idx_country_id ON profiles(country_id);
+CREATE INDEX IF NOT EXISTS idx_age ON profiles(age);
+CREATE INDEX IF NOT EXISTS idx_refresh_token ON refresh_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_refresh_token_user ON refresh_tokens(user_id);
