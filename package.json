@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "jest --passWithNoTests",
+    "test": "npx jest --passWithNoTests",
     "lint": "eslint . --ext .js",
     "start": "node index.js",
     "dev": "nodemon index.js"

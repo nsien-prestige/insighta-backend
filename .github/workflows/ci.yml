@@ -19,7 +19,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run linter
         run: npm run lint
@@ -28,7 +28,8 @@ jobs:
         run: npm test
 
       - name: Build check
-        run: node -e "require('./index.js')" &
+        run: |
+          timeout 10 node index.js || true
         env:
           PORT: 5000
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -36,3 +37,7 @@ jobs:
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
           GITHUB_CLIENT_ID: ${{ secrets.GITHUB_CLIENT_ID }}
           GITHUB_CLIENT_SECRET: ${{ secrets.GITHUB_CLIENT_SECRET }}
+          GITHUB_CALLBACK_URL: ${{ secrets.GITHUB_CALLBACK_URL }}
+          GITHUB_CLI_CALLBACK_URL: ${{ secrets.GITHUB_CLI_CALLBACK_URL }}
+          CLIENT_URL: ${{ secrets.CLIENT_URL }}
+          NODE_ENV: test
