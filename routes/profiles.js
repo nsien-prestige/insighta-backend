@@ -7,8 +7,8 @@ const requireRole = require('../middleware/requireRole');
 
 const router = express.Router();
 
-router.use(authenticate)
 router.use(requireApiVersion)
+router.use(authenticate)
 router.use(apiLimiter)
 
 // Public routes
