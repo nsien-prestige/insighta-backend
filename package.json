@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "jest --passWithNoTests",
-    "lint": "eslint",
+    "test": "npx jest --passWithNoTests",
+    "lint": "eslint . --ext .js",
     "start": "node index.js",
     "dev": "nodemon index.js"
   },
@@ -14,6 +14,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "axios": "^1.15.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
