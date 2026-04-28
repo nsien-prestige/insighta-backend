@@ -1,4 +1,4 @@
-const { verifyAcessToken } = require("../utils/token");
+const { verifyAccessToken } = require("../utils/token");
 
 const authenticate = (req, res, next) => {
     const authHeader = req.headers['authorization'];
@@ -13,7 +13,7 @@ const authenticate = (req, res, next) => {
     const token = authHeader.split(' ')[1]
 
     try {
-        const decoded = verifyAcessToken(token)
+        const decoded = verifyAccessToken(token)
         req.user = decoded
         next()
 

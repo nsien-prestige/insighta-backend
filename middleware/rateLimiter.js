@@ -28,3 +28,8 @@ const apiLimiter = rateLimit({
         })
     }
 })
+
+module.exports = {
+    authLimiter,
+    apiLimiter
+}
