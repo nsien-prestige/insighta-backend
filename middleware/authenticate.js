@@ -1,4 +1,4 @@
-const { verifyAccessToken } = require('../utils/tokens')
+const { verifyAccessToken } = require('../utils/token')
 
 const authenticate = (req, res, next) => {
     // Check Authorization header first (CLI)

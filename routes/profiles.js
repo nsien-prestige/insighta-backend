@@ -1,14 +1,14 @@
 const express = require('express');
 const { getAllProfiles, searchProfiles, exportProfiles, getProfileById, createProfile } = require('../controllers/profilesController');
 const authenticate = require('../middleware/authenticate');
-const requuireApiVersion = require('../middleware/requireApiVersion');
+const requireApiVersion = require('../middleware/requireApiVersion');
 const { apiLimiter } = require('../middleware/rateLimiter');
 const requireRole = require('../middleware/requireRole');
 
 const router = express.Router();
 
 router.use(authenticate)
-router.use(requuireApiVersion)
+router.use(requireApiVersion)
 router.use(apiLimiter)
 
 // Public routes

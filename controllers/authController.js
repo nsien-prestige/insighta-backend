@@ -5,7 +5,7 @@ const {
     generateAccessToken,
     generateRefreshToken,
     verifyRefreshToken
-} = require('../utils/tokens')
+} = require('../utils/token')
 
 // Helper - create or update user from github data
 const findOrCreateUser = async (githubUser, primaryEmail) => {

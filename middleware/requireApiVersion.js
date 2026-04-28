@@ -1,4 +1,4 @@
-const requuireApiVersion = (req, res, next) => {
+const requireApiVersion = (req, res, next) => {
     const apiVersion = req.headers['x-api-version'];
 
     if (!apiVersion) {
@@ -11,4 +11,4 @@ const requuireApiVersion = (req, res, next) => {
     next()
 }
 
-module.exports = requuireApiVersion
+module.exports = requireApiVersion
