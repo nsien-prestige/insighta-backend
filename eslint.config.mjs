@@ -5,7 +5,7 @@ export default [
     {
         languageOptions: {
             ecmaVersion: 2022,
-            sourceType: 'commonjs',
+            sourceType: 'module',
             globals: {
                 process: 'readonly',
                 __dirname: 'readonly',

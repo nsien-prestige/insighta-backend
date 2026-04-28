@@ -83,7 +83,7 @@ const githubLogin = (req, res) => {
 // GitHub redirects here after web login
 // Returns tokens as HTTP-only cookies (tokens never exposed to JS)
 const githubCallback = async (req, res) => {
-    const { code, state } = req.query
+    const { code } = req.query
 
     if (!code) {
         return res.status(400).json({
