@@ -377,5 +377,6 @@ module.exports = {
     githubCallback,
     cliCallback,
     refreshToken,
-    logout
+    logout,
+    getMe
 }
