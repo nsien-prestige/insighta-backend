@@ -270,14 +270,14 @@ const refreshToken = async (req, res) => {
 
         // If request came from web (has cookies), respond with cookies
         if (req.cookies?.refresh_token) {
-            res.cookie('access_token', accessToken, {
+            res.cookie('access_token', newAccessToken, {
                 httpOnly: true,
                 secure: true,
                 sameSite: 'none',
                 maxAge: 3 * 60 * 1000
             })
 
-            res.cookie('refresh_token', refreshToken, {
+            res.cookie('refresh_token', newRefreshToken, {
                 httpOnly: true,
                 secure: true,
                 sameSite: 'none',
