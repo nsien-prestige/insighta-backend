@@ -124,18 +124,17 @@ const githubCallback = async (req, res) => {
         // Set tokens as HTTP-only cookies - JS cannot read these
         res.cookie('access_token', accessToken, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: 3 * 60 * 1000 // 3 minutes
+            secure: true,
+            sameSite: 'none',
+            maxAge: 3 * 60 * 1000
         })
 
         res.cookie('refresh_token', refreshToken, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: 5 * 60 * 1000 // 5 minutes
+            secure: true,
+            sameSite: 'none',
+            maxAge: 5 * 60 * 1000
         })
-
         // Redirect to web portal dashboard
         res.redirect(`${process.env.CLIENT_URL}/dashboard.html`)
 
@@ -273,15 +272,15 @@ const refreshToken = async (req, res) => {
         if (req.cookies?.refresh_token) {
             res.cookie('access_token', newAccessToken, {
                 httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax',
+                secure: true,
+                sameSite: 'none',
                 maxAge: 3 * 60 * 1000
             })
 
             res.cookie('refresh_token', newRefreshToken, {
                 httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax',
+                secure: true,
+                sameSite: 'none',
                 maxAge: 5 * 60 * 1000
             })
 
