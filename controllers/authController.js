@@ -344,6 +344,34 @@ const logout = async (req, res) => {
     }
 }
 
+const getMe = async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT id, username, email, avatar_url, role, created_at, last_login_at
+             FROM users WHERE id = $1`,
+            [req.user.id]
+        )
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                "status": "error",
+                "message": "User not found"
+            })
+        }
+
+        res.status(200).json({
+            "status": "success",
+            "data": result.rows[0]
+        })
+    } catch (err) {
+        console.error(err)
+        res.status(500).json({
+            "status": "error",
+            "message": "Failed to fetch user info"
+        })
+    }
+}
+
 module.exports = {
     githubLogin,
     githubCallback,
