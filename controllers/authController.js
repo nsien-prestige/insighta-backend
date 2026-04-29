@@ -108,14 +108,14 @@ const githubCallback = async (req, res) => {
         const githubAccessToken = tokenResponse.data.access_token
 
         if (!githubAccessToken) {
-            return res.redirect(`${process.env.CLIENT_URL}/login?error=auth_failed`)
+            return res.redirect(`${process.env.CLIENT_URL}/index.html?error=auth_failed`)
         }
 
         const { githubUser, primaryEmail } = await getGithubUser(githubAccessToken)
         const user = await findOrCreateUser(githubUser, primaryEmail)
 
         if (!user.is_active) {
-            return res.redirect(`${process.env.CLIENT_URL}/login?error=account_disabled`)
+            return res.redirect(`${process.env.CLIENT_URL}/index.html?error=account_disabled`)
         }
 
         const accessToken = generateAccessToken(user)
@@ -137,11 +137,11 @@ const githubCallback = async (req, res) => {
         })
 
         // Redirect to web portal dashboard
-        res.redirect(`${process.env.CLIENT_URL}/dashboard`)
+        res.redirect(`${process.env.CLIENT_URL}/dashboard.html`)
 
     } catch (err) {
         console.error(err)
-        res.redirect(`${process.env.CLIENT_URL}/login?error=server_error`)
+        res.redirect(`${process.env.CLIENT_URL}/index.html?error=server_error`)
     }
 }
 
