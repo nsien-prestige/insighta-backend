@@ -165,10 +165,10 @@ const cliCallback = async (req, res) => {
         const tokenResponse = await axios.post(
             'https://github.com/login/oauth/access_token',
             {
-                client_id: process.env.GITHUB_CLIENT_ID,
-                client_secret: process.env.GITHUB_CLIENT_SECRET,
+                client_id: process.env.GITHUB_CLI_CLIENT_ID,
+                client_secret: process.env.GITHUB_CLI_CLIENT_SECRET,
                 code,
-                redirect_uri: process.env.GITHUB_CLI_CALLBACK_URL,
+                redirect_uri: 'http://localhost:9876/callback',
                 code_verifier
             },
             { headers: { Accept: 'application/json' } }
