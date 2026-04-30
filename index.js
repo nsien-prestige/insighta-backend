@@ -13,7 +13,8 @@ app.use(morgan('dev'))
 
 app.use(cors({
     origin: process.env.CLIENT_URL,
-    credentials: true
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Version']
 }));
 
 app.use(express.json());
