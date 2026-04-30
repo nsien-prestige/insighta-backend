@@ -4,8 +4,8 @@ const axios = require('axios')
 const parseNaturalQuery = require('../utils/queryParser')
 
 const getAllProfiles = async (req, res) => {
-    const page = parseInt(req.query.page) || 1
-    const limit = Math.min(parseInt(req.query.limit) || 10, 50)
+    const page = Math.max(1, parseInt(req.query.page) || 1)
+    const limit = Math.max(1, Math.min(parseInt(req.query.limit) || 10, 50))
     const sortBy = req.query.sort_by || 'created_at'
     const order = req.query.order || 'asc'
 
@@ -122,7 +122,6 @@ const getAllProfiles = async (req, res) => {
         const total = parseInt(totalResult.rows[0].count)
         const total_pages = Math.ceil(total / limit)
 
-        // Build query string for links
         const baseQuery = new URLSearchParams(req.query)
         baseQuery.set('limit', limit)
 
@@ -156,8 +155,8 @@ const getAllProfiles = async (req, res) => {
 
 const searchProfiles = async (req, res) => {
     const { q } = req.query
-    const page = parseInt(req.query.page) || 1
-    const limit = Math.min(parseInt(req.query.limit) || 10, 50)
+    const page = Math.max(1, parseInt(req.query.page) || 1)
+    const limit = Math.max(1, Math.min(parseInt(req.query.limit) || 10, 50))
     const offset = (page - 1) * limit
 
     if (!q || q.trim() === '') {
@@ -374,6 +373,35 @@ const createProfile = async (req, res) => {
     }
 }
 
+const deleteProfile = async (req, res) => {
+    const { id } = req.params
+
+    try {
+        const result = await pool.query(
+            `DELETE FROM profiles WHERE id = $1 RETURNING id`,
+            [id]
+        )
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                status: 'error',
+                message: 'Profile not found'
+            })
+        }
+
+        res.status(200).json({
+            status: 'success',
+            message: 'Profile deleted'
+        })
+    } catch (err) {
+        console.error(err)
+        res.status(500).json({
+            status: 'error',
+            message: 'Internal Server Error'
+        })
+    }
+}
+
 const exportProfiles = async (req, res) => {
     const sortBy = req.query.sort_by || 'created_at'
     const order = req.query.order || 'asc'
@@ -429,7 +457,6 @@ const exportProfiles = async (req, res) => {
             values
         )
 
-        // Build CSV
         const headers = 'id,name,gender,gender_probability,age,age_group,country_id,country_name,country_probability,created_at'
 
         const rows = result.rows.map(row =>
@@ -468,5 +495,6 @@ module.exports = {
     searchProfiles,
     getProfileById,
     createProfile,
+    deleteProfile,
     exportProfiles
 }
