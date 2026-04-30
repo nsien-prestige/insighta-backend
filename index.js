@@ -11,6 +11,11 @@ const { getMe } = require('./controllers/authController');
 
 const app = express()
 
+// Trust the first proxy hop so req.ip reflects the real client IP.
+// Required for express-rate-limit to work correctly on deployed servers
+// (Railway, Render, Heroku, etc.) that sit behind a reverse proxy.
+app.set('trust proxy', 1)
+
 app.use(morgan('dev'))
 
 app.use(cors({
