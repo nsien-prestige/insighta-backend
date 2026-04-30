@@ -58,12 +58,12 @@ const getGithubUser = async (githubAccessToken) => {
 
 // Step 1 - Redirect user to GitHub OAuth page (both CLI and web use this)
 const githubLogin = (req, res) => {
-    const { state, code_challenge } = req.query
+    const { state, code_challenge, is_cli } = req.query
 
-    if (!state || !code_challenge) {
+    if (!state) {
         return res.status(400).json({
             status: 'error',
-            message: 'Missing state or code_challenge'
+            message: 'Missing state'
         })
     }
 
@@ -71,10 +71,14 @@ const githubLogin = (req, res) => {
         client_id: process.env.GITHUB_CLIENT_ID,
         redirect_uri: process.env.GITHUB_CALLBACK_URL,
         scope: 'read:user user:email',
-        state,
-        code_challenge,
-        code_challenge_method: 'S256'
+        state
     })
+
+    // Only add PKCE params if it's a CLI request
+    if (is_cli === 'true' && code_challenge) {
+        params.set('code_challenge', code_challenge)
+        params.set('code_challenge_method', 'S256')
+    }
 
     res.redirect(`https://github.com/login/oauth/authorize?${params}`)
 }
