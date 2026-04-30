@@ -1,11 +1,30 @@
 const pool = require('../db/db')
 const { uuidv7 } = require('uuidv7')
 const axios = require('axios')
+const crypto = require('crypto')
 const {
     generateAccessToken,
     generateRefreshToken,
     verifyRefreshToken
 } = require('../utils/token')
+
+// In-memory state store: state value → expiry timestamp
+const stateStore = new Map()
+
+const storeState = (state) => {
+    const now = Date.now()
+    stateStore.set(state, now + 10 * 60 * 1000)
+    for (const [key, expires] of stateStore.entries()) {
+        if (expires < now) stateStore.delete(key)
+    }
+}
+
+const validateAndConsumeState = (state) => {
+    const expires = stateStore.get(state)
+    if (!expires || expires < Date.now()) return false
+    stateStore.delete(state)
+    return true
+}
 
 const findOrCreateUser = async (githubUser, primaryEmail) => {
     const existingUser = await pool.query(
@@ -56,14 +75,13 @@ const getGithubUser = async (githubAccessToken) => {
 
 // Step 1 - Redirect to GitHub OAuth
 const githubLogin = (req, res) => {
-    const { state, code_challenge, is_cli } = req.query
+    let { state, code_challenge, is_cli } = req.query
 
     if (!state) {
-        return res.status(400).json({
-            status: 'error',
-            message: 'Missing state'
-        })
+        state = crypto.randomBytes(16).toString('hex')
     }
+
+    storeState(state)
 
     const params = new URLSearchParams({
         client_id: process.env.GITHUB_CLIENT_ID,
