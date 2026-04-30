@@ -19,10 +19,11 @@ const apiLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: (req) => {
-        // Use user ID if authenticated, otherwise use IP address
+        // Use user ID if authenticated, otherwise fall back to IP
         if (req.user) return req.user.id
-        // Fall back to IP - req.ip is always available in Express
-        return req.ip || req.socket?.remoteAddress || 'unknown'
+        // Strip ::ffff: prefix from IPv4-mapped IPv6 addresses
+        const ip = req.ip || req.socket?.remoteAddress || 'unknown'
+        return ip.replace(/^::ffff:/, '')
     },
     handler: (req, res) => {
         res.status(429).json({
