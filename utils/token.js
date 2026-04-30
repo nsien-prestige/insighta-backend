@@ -2,9 +2,9 @@ const jwt = require('jsonwebtoken')
 const { uuidv7 } = require('uuidv7')
 const pool = require('../db/db')
 
-const ACCESS_TOKEN_EXPIRY = '3m'
-const REFRESH_TOKEN_EXPIRY = '5m'
-const REFRESH_TOKEN_EXPIRY_MS = 5 * 60 * 1000
+const ACCESS_TOKEN_EXPIRY = '10m'
+const REFRESH_TOKEN_EXPIRY = '10m'
+const REFRESH_TOKEN_EXPIRY_MS = 10 * 60 * 1000
 
 const generateAccessToken = (user) => {
     return jwt.sign(
