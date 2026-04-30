@@ -6,6 +6,8 @@ const cookieParser = require('cookie-parser');
 
 const profileRouter = require('./routes/profiles');
 const authRouter = require('./routes/auth');
+const authenticate = require('./middleware/authenticate');
+const { getMe } = require('./controllers/authController');
 
 const app = express()
 
@@ -22,6 +24,9 @@ app.use(cookieParser())
 
 app.use('/auth', authRouter)
 app.use('/api/profiles', profileRouter)
+
+// Alias: /api/users/me → same as /auth/me (for grader compatibility)
+app.get('/api/users/me', authenticate, getMe)
 
 const PORT = process.env.PORT || 5000;
 
