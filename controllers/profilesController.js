@@ -517,11 +517,140 @@ const exportProfiles = async (req, res) => {
     }
 }
 
+const importProfiles = async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({
+            "status": "error",
+            "message": "No file uploaded"
+        })
+    }
+
+    const { Readable } = require('stream')
+    const { parse } = require('csv-parse')
+
+    const buffer = req.file.buffer
+    const stream = Readable.from(buffer)
+
+    let skipped = 0
+    let inserted = 0
+
+    const reasons = {
+        duplicate_name: 0,
+        invalid_age: 0,
+        missing_fields: 0,
+        malformed_row: 0,
+        invalid_gender: 0
+    }
+
+    let chunk = []
+
+    const parser = stream.pipe(parse({
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+        delimiter: ","
+    }))
+
+    try {
+        for await (const row of parser) {
+            // Validate rows 
+        
+            if (!row.name || !row.gender || !row.age || !row.age_group || !row.country_id || !row.country_name) {
+                skipped++
+                reasons.missing_fields++
+
+                continue
+            }
+
+            if (!['male', 'female'].includes(row.gender)) {
+                skipped++
+                reasons.invalid_gender++
+
+                continue
+            }
+
+            if (parseInt(row.age) <= 0 || isNaN(parseInt(row.age))) {
+                skipped++
+                reasons.invalid_age++
+
+                continue
+            }
+
+            const existing = await pool.query(
+                'SELECT id FROM profiles WHERE name = $1', 
+                [row.name]
+            )
+
+            if (existing.rows.length > 0) {
+                skipped++
+                reasons.duplicate_name++
+                continue
+            }
+
+            chunk.push(row)
+
+            // If chunk.length === 1000, bulk insert and reset chunk
+            if (chunk.length === 1000) {
+                await bulkInsert(chunk)
+                inserted += chunk.length
+                chunk = []
+            }
+        }
+
+        // insert remaining rows of chunk here
+        if (chunk.length > 0) {
+            await bulkInsert(chunk)
+            inserted += chunk.length
+        }
+
+        return res.status(200).json({
+            status: 'success',
+            inserted,
+            skipped,
+            reasons
+        })
+    } catch (err) {
+        // malformed row — csv-parse throws here
+        skipped++
+        reasons.malformed_row++
+    }
+    
+}
+
+const bulkInsert = async (rows) => {
+    // Build placeholder groups like ($1,$2,...,$9), ($10,$11,...,$18)
+    const placeholders = rows.map((_, i) =>
+        `($${i*9+1},$${i*9+2},$${i*9+3},$${i*9+4},$${i*9+5},$${i*9+6},$${i*9+7},$${i*9+8},$${i*9+9})`
+    ).join(', ')
+
+    // Flatten all row values into one array
+    const values = rows.flatMap(row => [
+        uuidv7(),
+        row.name,
+        row.gender,
+        parseFloat(row.gender_probability) || 0.5,
+        parseInt(row.age),
+        row.age_group,
+        row.country_id,
+        row.country_name,
+        parseFloat(row.country_probability) || 0.5
+    ])
+
+    await pool.query(
+        `INSERT INTO profiles 
+        (id, name, gender, gender_probability, age, age_group, country_id, country_name, country_probability)
+        VALUES ${placeholders}
+        ON CONFLICT (name) DO NOTHING`,
+        values
+    )
+}
+
 module.exports = {
     getAllProfiles,
     searchProfiles,
     getProfileById,
     createProfile,
     deleteProfile,
-    exportProfiles
+    exportProfiles,
+    importProfiles
 }
