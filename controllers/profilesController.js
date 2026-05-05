@@ -2,6 +2,7 @@ const pool = require('../db/db')
 const { uuidv7 } = require('uuidv7')
 const axios = require('axios')
 const parseNaturalQuery = require('../utils/queryParser')
+const redis = require('../utils/redis')
 
 const getAllProfiles = async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page) || 1)
@@ -41,6 +42,14 @@ const getAllProfiles = async (req, res) => {
     const offset = (page - 1) * limit
 
     try {
+        // Check Redis cache first
+        const cacheKey =`profiles:${JSON.stringify(req.query)}`
+        const cache = await redis.get(cacheKey)
+
+        if (cache) {
+            return res.status(200).json(JSON.parse(cache))
+        }
+
         const conditions = []
         const values = []
 
@@ -134,7 +143,7 @@ const getAllProfiles = async (req, res) => {
         baseQuery.set('page', page - 1)
         const prevLink = page > 1 ? `/api/profiles?${baseQuery.toString()}` : null
 
-        res.status(200).json({
+        const responseData = {
             status: 'success',
             page,
             limit,
@@ -146,7 +155,11 @@ const getAllProfiles = async (req, res) => {
                 prev: prevLink
             },
             data: result.rows
-        })
+        }
+
+        await redis.setex(cacheKey, 60, JSON.stringify(responseData))
+        res.status(200).json(responseData)
+
     } catch (err) {
         console.error(err)
         res.status(500).json({ status: 'error', message: 'Internal Server Error' })
