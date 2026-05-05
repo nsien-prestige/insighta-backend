@@ -119,16 +119,17 @@ const getAllProfiles = async (req, res) => {
         values.push(limit, offset)
 
         const result = await pool.query(
-            `SELECT * FROM profiles ${whereClause} ORDER BY ${sortBy} ${order} LIMIT $${values.length - 1} OFFSET $${values.length}`,
+            `SELECT *, COUNT(*) OVER() AS total_count
+             FROM profiles
+             ${whereClause}
+             ORDER BY ${sortBy} ${order}
+             LIMIT $${values.length - 1}
+             OFFSET $${values.length}`,
             values
         )
 
-        const totalResult = await pool.query(
-            `SELECT COUNT(*) FROM profiles ${whereClause}`,
-            values.slice(0, -2)
-        )
-
-        const total = parseInt(totalResult.rows[0].count)
+        const rows = result.rows
+        const total = rows.length > 0 ? parseInt(rows[0].total_count) : 0
         const total_pages = Math.ceil(total / limit)
 
         const baseQuery = new URLSearchParams(req.query)
@@ -154,7 +155,7 @@ const getAllProfiles = async (req, res) => {
                 next: nextLink,
                 prev: prevLink
             },
-            data: result.rows
+            data: rows
         }
 
         await redis.setex(cacheKey, 60, JSON.stringify(responseData))
@@ -232,19 +233,17 @@ const searchProfiles = async (req, res) => {
         values.push(limit, offset)
 
         const result = await pool.query(
-            `SELECT * FROM profiles
-            ${whereClause}
-            LIMIT $${values.length - 1}
-            OFFSET $${values.length}`,
+            `SELECT *, COUNT(*) OVER() AS total_count
+             FROM profiles
+             ${whereClause}
+             ORDER BY created_at asc
+             LIMIT $${values.length - 1}
+             OFFSET $${values.length}`,
             values
         )
 
-        const totalResult = await pool.query(
-            `SELECT COUNT(*) FROM profiles ${whereClause}`,
-            values.slice(0, -2)
-        )
-
-        const total = parseInt(totalResult.rows[0].count)
+        const rows = result.rows
+        const total = rows.length > 0 ? parseInt(rows[0].total_count) : 0
         const total_pages = Math.ceil(total / limit)
 
         const baseQuery = new URLSearchParams(req.query)
@@ -270,12 +269,12 @@ const searchProfiles = async (req, res) => {
                 next: nextLink,
                 prev: prevLink
             },
-            data: result.rows
+            data: rows
         }
 
         await redis.setex(cacheKey, 60, JSON.stringify(responseData))
         res.status(200).json(responseData)
-        
+
     } catch (err) {
         console.error(err)
         res.status(500).json({
