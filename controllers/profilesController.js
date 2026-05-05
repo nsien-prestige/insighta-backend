@@ -533,6 +533,7 @@ const importProfiles = async (req, res) => {
 
     let skipped = 0
     let inserted = 0
+    let total_rows = 0
 
     const reasons = {
         duplicate_name: 0,
@@ -553,6 +554,7 @@ const importProfiles = async (req, res) => {
 
     try {
         for await (const row of parser) {
+            total_rows++
             // Validate rows 
         
             if (!row.name || !row.gender || !row.age || !row.age_group || !row.country_id || !row.country_name) {
@@ -605,6 +607,7 @@ const importProfiles = async (req, res) => {
 
         return res.status(200).json({
             status: 'success',
+            total_rows,
             inserted,
             skipped,
             reasons
