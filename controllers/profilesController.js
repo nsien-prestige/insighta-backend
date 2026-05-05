@@ -189,6 +189,14 @@ const searchProfiles = async (req, res) => {
     }
 
     try {
+        // Check redis cache first
+        const cacheKey = `profiles:search:${JSON.stringify(req.query)}`
+        const cache = await redis.get(cacheKey)
+
+        if (cache) {
+            return res.status(200).json(JSON.parse(cache))
+        }
+
         const conditions = []
         const values = []
 
@@ -251,7 +259,7 @@ const searchProfiles = async (req, res) => {
         baseQuery.set('page', page - 1)
         const prevLink = page > 1 ? `/api/profiles/search?${baseQuery.toString()}` : null
 
-        res.status(200).json({
+        const responseData = {
             status: 'success',
             page,
             limit,
@@ -263,7 +271,11 @@ const searchProfiles = async (req, res) => {
                 prev: prevLink
             },
             data: result.rows
-        })
+        }
+
+        await redis.setex(cacheKey, 60, JSON.stringify(responseData))
+        res.status(200).json(responseData)
+        
     } catch (err) {
         console.error(err)
         res.status(500).json({
