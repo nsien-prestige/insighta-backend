@@ -15,11 +15,11 @@ Replaced the two-query pattern (one for data, one for COUNT) in `getAllProfiles`
 
 | Scenario | Before | After |
 |---|---|---|
-| First request (cache miss) | ~800ms | ~400ms |
-| Repeated request (cache hit) | ~800ms | ~15ms |
-| Filtered query | ~900ms | ~420ms |
+| First request (cache miss) | ~3456ms | ~3564ms* |
+| Repeated request (cache hit) | ~1220ms | ~370ms |
+| Filtered query (cache hit) | ~869ms | ~344ms |
 
-*Measurements approximate based on remote DB latency from Hostless to Supabase.*
+> *Cache miss times were measured locally where the backend connects to Supabase over a residential internet connection, causing higher latency (~3400ms). On the live server (Hostless), both backend and database are cloud-hosted so cache miss latency is significantly lower. Cache hit performance is consistent across both environments.
 
 ---
 
@@ -62,7 +62,7 @@ This is deterministic, introduces no incorrect interpretations, and uses no AI o
 - Malformed CSV row (caught by try/catch around parser) → `malformed_row`
 
 ### Failure Handling
-A single bad row never fails the upload. Rows already inserted are kept — there is no rollback. The response always returns a summary of inserted vs skipped rows with breakdown by reason.
+A single bad row never fails the upload. Rows already inserted are kept — there is no rollback. The response always returns a summary of inserted vs skipped rows with breakdown by reason. If the parser throws on a malformed row, any rows collected before the error are still inserted and the summary is returned.
 
 ### Concurrency
 Uploads do not block read queries. The streaming approach means memory usage stays low regardless of file size. Multiple uploads can run concurrently since each is an independent stream with its own chunk buffer.
@@ -71,6 +71,7 @@ Uploads do not block read queries. The streaming approach means memory usage sta
 
 ## Trade-offs
 
-- The duplicate check (`SELECT id WHERE name = $1`) runs per row before inserting. For very large files this adds latency but ensures accurate `duplicate_name` counts. A future optimization would be to defer this check to the bulk insert and infer duplicates from `ON CONFLICT` rows affected count.
+- The duplicate check (`SELECT id WHERE name = $1`) runs per row before inserting. For very large files this adds latency but ensures accurate `duplicate_name` counts. A future optimization would be to defer this check to the bulk insert and infer duplicates from rows affected count.
 - Redis is a single instance — if it goes down, requests fall through to the database gracefully since cache misses are handled.
 - Cache TTL of 60 seconds means slight staleness is possible for read queries immediately after a write. This is acceptable per the consistency requirements.
+- Connection pool `connectionTimeoutMillis` is set to 2000ms which may be tight for cold starts on the remote Supabase instance. This can be increased if timeouts are observed in production.
