@@ -3,6 +3,7 @@ const { uuidv7 } = require('uuidv7')
 const axios = require('axios')
 const parseNaturalQuery = require('../utils/queryParser')
 const redis = require('../utils/redis')
+const normalizeFilters = require('../utils/normalizeFilters')
 
 const getAllProfiles = async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page) || 1)
@@ -190,8 +191,10 @@ const searchProfiles = async (req, res) => {
     }
 
     try {
+        const normalized = normalizeFilters(filters)
+
         // Check redis cache first
-        const cacheKey = `profiles:search:${JSON.stringify(req.query)}`
+        const cacheKey = `profiles:search:${JSON.stringify(normalized)}`
         const cache = await redis.get(cacheKey)
 
         if (cache) {
