@@ -612,10 +612,24 @@ const importProfiles = async (req, res) => {
             skipped,
             reasons
         })
-    } catch (err) {
+    } catch {
         // malformed row — csv-parse throws here
         skipped++
         reasons.malformed_row++
+
+        // insert any rows collected before the error
+        if (chunk.length > 0) {
+            await bulkInsert(chunk)
+            inserted += chunk.length
+        }
+
+        return res.status(200).json({
+            status: 'success',
+            total_rows,
+            inserted,
+            skipped,
+            reasons
+        })
     }
     
 }
