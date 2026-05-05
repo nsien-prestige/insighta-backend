@@ -18,13 +18,6 @@ const apiLimiter = rateLimit({
     max: 60, // limit each IP to 60 requests per windowMs
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: (req) => {
-        // Use user ID if authenticated, otherwise fall back to IP
-        if (req.user) return req.user.id
-        // Strip ::ffff: prefix from IPv4-mapped IPv6 addresses
-        const ip = req.ip || req.socket?.remoteAddress || 'unknown'
-        return ip.replace(/^::ffff:/, '')
-    },
     handler: (req, res) => {
         res.status(429).json({
             status: 'error',

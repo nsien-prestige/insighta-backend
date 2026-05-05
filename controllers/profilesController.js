@@ -2,6 +2,8 @@ const pool = require('../db/db')
 const { uuidv7 } = require('uuidv7')
 const axios = require('axios')
 const parseNaturalQuery = require('../utils/queryParser')
+const redis = require('../utils/redis')
+const normalizeFilters = require('../utils/normalizeFilters')
 
 const getAllProfiles = async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page) || 1)
@@ -41,6 +43,14 @@ const getAllProfiles = async (req, res) => {
     const offset = (page - 1) * limit
 
     try {
+        // Check Redis cache first
+        const cacheKey =`profiles:${JSON.stringify(req.query)}`
+        const cache = await redis.get(cacheKey)
+
+        if (cache) {
+            return res.status(200).json(JSON.parse(cache))
+        }
+
         const conditions = []
         const values = []
 
@@ -110,16 +120,17 @@ const getAllProfiles = async (req, res) => {
         values.push(limit, offset)
 
         const result = await pool.query(
-            `SELECT * FROM profiles ${whereClause} ORDER BY ${sortBy} ${order} LIMIT $${values.length - 1} OFFSET $${values.length}`,
+            `SELECT *, COUNT(*) OVER() AS total_count
+             FROM profiles
+             ${whereClause}
+             ORDER BY ${sortBy} ${order}
+             LIMIT $${values.length - 1}
+             OFFSET $${values.length}`,
             values
         )
 
-        const totalResult = await pool.query(
-            `SELECT COUNT(*) FROM profiles ${whereClause}`,
-            values.slice(0, -2)
-        )
-
-        const total = parseInt(totalResult.rows[0].count)
+        const rows = result.rows
+        const total = rows.length > 0 ? parseInt(rows[0].total_count) : 0
         const total_pages = Math.ceil(total / limit)
 
         const baseQuery = new URLSearchParams(req.query)
@@ -134,7 +145,7 @@ const getAllProfiles = async (req, res) => {
         baseQuery.set('page', page - 1)
         const prevLink = page > 1 ? `/api/profiles?${baseQuery.toString()}` : null
 
-        res.status(200).json({
+        const responseData = {
             status: 'success',
             page,
             limit,
@@ -145,8 +156,12 @@ const getAllProfiles = async (req, res) => {
                 next: nextLink,
                 prev: prevLink
             },
-            data: result.rows
-        })
+            data: rows
+        }
+
+        await redis.setex(cacheKey, 60, JSON.stringify(responseData))
+        res.status(200).json(responseData)
+
     } catch (err) {
         console.error(err)
         res.status(500).json({ status: 'error', message: 'Internal Server Error' })
@@ -176,6 +191,16 @@ const searchProfiles = async (req, res) => {
     }
 
     try {
+        const normalized = normalizeFilters(filters)
+
+        // Check redis cache first
+        const cacheKey = `profiles:search:${JSON.stringify(normalized)}`
+        const cache = await redis.get(cacheKey)
+
+        if (cache) {
+            return res.status(200).json(JSON.parse(cache))
+        }
+
         const conditions = []
         const values = []
 
@@ -211,19 +236,17 @@ const searchProfiles = async (req, res) => {
         values.push(limit, offset)
 
         const result = await pool.query(
-            `SELECT * FROM profiles
-            ${whereClause}
-            LIMIT $${values.length - 1}
-            OFFSET $${values.length}`,
+            `SELECT *, COUNT(*) OVER() AS total_count
+             FROM profiles
+             ${whereClause}
+             ORDER BY created_at asc
+             LIMIT $${values.length - 1}
+             OFFSET $${values.length}`,
             values
         )
 
-        const totalResult = await pool.query(
-            `SELECT COUNT(*) FROM profiles ${whereClause}`,
-            values.slice(0, -2)
-        )
-
-        const total = parseInt(totalResult.rows[0].count)
+        const rows = result.rows
+        const total = rows.length > 0 ? parseInt(rows[0].total_count) : 0
         const total_pages = Math.ceil(total / limit)
 
         const baseQuery = new URLSearchParams(req.query)
@@ -238,7 +261,7 @@ const searchProfiles = async (req, res) => {
         baseQuery.set('page', page - 1)
         const prevLink = page > 1 ? `/api/profiles/search?${baseQuery.toString()}` : null
 
-        res.status(200).json({
+        const responseData = {
             status: 'success',
             page,
             limit,
@@ -249,8 +272,12 @@ const searchProfiles = async (req, res) => {
                 next: nextLink,
                 prev: prevLink
             },
-            data: result.rows
-        })
+            data: rows
+        }
+
+        await redis.setex(cacheKey, 60, JSON.stringify(responseData))
+        res.status(200).json(responseData)
+
     } catch (err) {
         console.error(err)
         res.status(500).json({
@@ -490,11 +517,157 @@ const exportProfiles = async (req, res) => {
     }
 }
 
+const importProfiles = async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({
+            "status": "error",
+            "message": "No file uploaded"
+        })
+    }
+
+    const { Readable } = require('stream')
+    const { parse } = require('csv-parse')
+
+    const buffer = req.file.buffer
+    const stream = Readable.from(buffer)
+
+    let skipped = 0
+    let inserted = 0
+    let total_rows = 0
+
+    const reasons = {
+        duplicate_name: 0,
+        invalid_age: 0,
+        missing_fields: 0,
+        malformed_row: 0,
+        invalid_gender: 0
+    }
+
+    let chunk = []
+
+    const parser = stream.pipe(parse({
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+        delimiter: ","
+    }))
+
+    try {
+        for await (const row of parser) {
+            total_rows++
+            // Validate rows 
+        
+            if (!row.name || !row.gender || !row.age || !row.age_group || !row.country_id || !row.country_name) {
+                skipped++
+                reasons.missing_fields++
+
+                continue
+            }
+
+            if (!['male', 'female'].includes(row.gender)) {
+                skipped++
+                reasons.invalid_gender++
+
+                continue
+            }
+
+            if (parseInt(row.age) <= 0 || isNaN(parseInt(row.age))) {
+                skipped++
+                reasons.invalid_age++
+
+                continue
+            }
+
+            const existing = await pool.query(
+                'SELECT id FROM profiles WHERE name = $1', 
+                [row.name]
+            )
+
+            if (existing.rows.length > 0) {
+                skipped++
+                reasons.duplicate_name++
+                continue
+            }
+
+            chunk.push(row)
+
+            // If chunk.length === 1000, bulk insert and reset chunk
+            if (chunk.length === 1000) {
+                await bulkInsert(chunk)
+                inserted += chunk.length
+                chunk = []
+            }
+        }
+
+        // insert remaining rows of chunk here
+        if (chunk.length > 0) {
+            await bulkInsert(chunk)
+            inserted += chunk.length
+        }
+
+        return res.status(200).json({
+            status: 'success',
+            total_rows,
+            inserted,
+            skipped,
+            reasons
+        })
+    } catch {
+        // malformed row — csv-parse throws here
+        skipped++
+        reasons.malformed_row++
+
+        // insert any rows collected before the error
+        if (chunk.length > 0) {
+            await bulkInsert(chunk)
+            inserted += chunk.length
+        }
+
+        return res.status(200).json({
+            status: 'success',
+            total_rows,
+            inserted,
+            skipped,
+            reasons
+        })
+    }
+    
+}
+
+const bulkInsert = async (rows) => {
+    // Build placeholder groups like ($1,$2,...,$9), ($10,$11,...,$18)
+    const placeholders = rows.map((_, i) =>
+        `($${i*9+1},$${i*9+2},$${i*9+3},$${i*9+4},$${i*9+5},$${i*9+6},$${i*9+7},$${i*9+8},$${i*9+9})`
+    ).join(', ')
+
+    // Flatten all row values into one array
+    const values = rows.flatMap(row => [
+        uuidv7(),
+        row.name,
+        row.gender,
+        parseFloat(row.gender_probability) || 0.5,
+        parseInt(row.age),
+        row.age_group,
+        row.country_id,
+        row.country_name,
+        parseFloat(row.country_probability) || 0.5
+    ])
+
+    await pool.query(
+        `INSERT INTO profiles 
+        (id, name, gender, gender_probability, age, age_group, country_id, country_name, country_probability)
+        VALUES ${placeholders}
+        ON CONFLICT (name) DO NOTHING`,
+        values
+    )
+}
+
 module.exports = {
     getAllProfiles,
     searchProfiles,
     getProfileById,
     createProfile,
     deleteProfile,
-    exportProfiles
+    exportProfiles,
+    importProfiles
 }

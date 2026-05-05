@@ -1,9 +1,10 @@
 const express = require('express');
-const { getAllProfiles, searchProfiles, exportProfiles, getProfileById, createProfile, deleteProfile } = require('../controllers/profilesController');
+const { getAllProfiles, searchProfiles, exportProfiles, getProfileById, createProfile, deleteProfile, importProfiles } = require('../controllers/profilesController');
 const authenticate = require('../middleware/authenticate');
 const requireApiVersion = require('../middleware/requireApiVersion');
 const { apiLimiter } = require('../middleware/rateLimiter');
 const requireRole = require('../middleware/requireRole');
+const upload = require('../middleware/upload')
 
 const router = express.Router();
 
@@ -19,5 +20,6 @@ router.get('/:id', getProfileById)
 // Admin only routes
 router.post('/', requireRole('admin'), createProfile)
 router.delete('/:id', requireRole('admin'), deleteProfile)
+router.post('/import', requireRole('admin'), upload, importProfiles)
 
 module.exports = router
