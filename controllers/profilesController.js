@@ -520,8 +520,8 @@ const exportProfiles = async (req, res) => {
 const importProfiles = async (req, res) => {
     if (!req.file) {
         return res.status(400).json({
-            "status": "error",
-            "message": "No file uploaded"
+            status: 'error',
+            message: 'No file uploaded'
         })
     }
 
@@ -549,60 +549,68 @@ const importProfiles = async (req, res) => {
         columns: true,
         skip_empty_lines: true,
         trim: true,
-        delimiter: ","
+        delimiter: ','
     }))
+
+    const processChunk = async (rows) => {
+        // Check ALL names in one query
+        const names = rows.map(r => r.name)
+        const existing = await pool.query(
+            `SELECT name FROM profiles WHERE name = ANY($1)`,
+            [names]
+        )
+        const existingNames = new Set(existing.rows.map(r => r.name))
+
+        // Filter out duplicates
+        const newRows = rows.filter(r => {
+            if (existingNames.has(r.name)) {
+                skipped++
+                reasons.duplicate_name++
+                return false
+            }
+            return true
+        })
+
+        if (newRows.length > 0) {
+            await bulkInsert(newRows)
+            inserted += newRows.length
+        }
+
+        chunk = []
+    }
 
     try {
         for await (const row of parser) {
             total_rows++
-            // Validate rows 
-        
+
             if (!row.name || !row.gender || !row.age || !row.age_group || !row.country_id || !row.country_name) {
                 skipped++
                 reasons.missing_fields++
-
                 continue
             }
 
             if (!['male', 'female'].includes(row.gender)) {
                 skipped++
                 reasons.invalid_gender++
-
                 continue
             }
 
             if (parseInt(row.age) <= 0 || isNaN(parseInt(row.age))) {
                 skipped++
                 reasons.invalid_age++
-
-                continue
-            }
-
-            const existing = await pool.query(
-                'SELECT id FROM profiles WHERE name = $1', 
-                [row.name]
-            )
-
-            if (existing.rows.length > 0) {
-                skipped++
-                reasons.duplicate_name++
                 continue
             }
 
             chunk.push(row)
 
-            // If chunk.length === 1000, bulk insert and reset chunk
             if (chunk.length === 1000) {
-                await bulkInsert(chunk)
-                inserted += chunk.length
-                chunk = []
+                await processChunk(chunk)
             }
         }
 
-        // insert remaining rows of chunk here
+        // Process remaining rows
         if (chunk.length > 0) {
-            await bulkInsert(chunk)
-            inserted += chunk.length
+            await processChunk(chunk)
         }
 
         return res.status(200).json({
@@ -612,15 +620,13 @@ const importProfiles = async (req, res) => {
             skipped,
             reasons
         })
+
     } catch {
-        // malformed row — csv-parse throws here
         skipped++
         reasons.malformed_row++
 
-        // insert any rows collected before the error
         if (chunk.length > 0) {
-            await bulkInsert(chunk)
-            inserted += chunk.length
+            await processChunk(chunk)
         }
 
         return res.status(200).json({
@@ -631,7 +637,6 @@ const importProfiles = async (req, res) => {
             reasons
         })
     }
-    
 }
 
 const bulkInsert = async (rows) => {
