@@ -583,7 +583,7 @@ const importProfiles = async (req, res) => {
         for await (const row of parser) {
             total_rows++
 
-            if (!row.name || !row.gender || !row.age || !row.age_group || !row.country_id || !row.country_name) {
+            if (!row.name || !row.gender || !row.age || !row.country_id || !row.country_name) {
                 skipped++
                 reasons.missing_fields++
                 continue
@@ -601,7 +601,15 @@ const importProfiles = async (req, res) => {
                 continue
             }
 
-            chunk.push(row)
+            const ageNum = parseInt(row.age)
+            let age_group
+
+            if (ageNum < 13) age_group = 'child'
+            else if (ageNum < 18) age_group = 'teenager'
+            else if (ageNum < 65) age_group = 'adult'
+            else age_group = 'senior'
+
+            chunk.push({ ...row, age_group })
 
             if (chunk.length === 1000) {
                 await processChunk(chunk)
